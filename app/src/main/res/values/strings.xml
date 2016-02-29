@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">BakuBus</string>
+    <string name="deselect_all">Deselect all</string>
+    <string name="internet_required">İnternetlə əlaqə mövcud deyildir</string>
+</resources>
