@@ -275,7 +275,7 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
                 selected[i] = selectedRoutes.contains(titles[i])
             }
 
-            val builder = AlertDialog.Builder(activity)
+            val builder = AlertDialog.Builder(activity, R.style.AlertDialog)
 
             builder.setMultiChoiceItems(titles.toTypedArray(), selected.toBooleanArray()) {
                 dialogInterface, position, value ->
@@ -316,7 +316,7 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
                     array.put(titles[i])
             }
 
-            preferences?.edit()?.putString("filter", array.toString())?.commit()
+            preferences.edit()?.putString("filter", array.toString())?.commit()
         }
     }
 }
