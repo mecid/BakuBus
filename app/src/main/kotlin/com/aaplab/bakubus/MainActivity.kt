@@ -40,7 +40,7 @@ import java.util.*
 /**
  * Created by user on 22.02.16.
  */
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
     val MY_LOCATION_REQUEST_CODE = 88
 
     val preferences: SharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
@@ -72,10 +72,18 @@ class MainActivity : AppCompatActivity() {
     fun enableMyLocation(map: GoogleMap) {
         if (ContextCompat.checkSelfPermission(this,
                 Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            map.setOnMyLocationChangeListener(this)
             map.isMyLocationEnabled = true
         } else {
             ActivityCompat.requestPermissions(this,
                     arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), MY_LOCATION_REQUEST_CODE)
+        }
+    }
+
+    override fun onMyLocationChange(location: Location?) {
+        if (markers.isNotEmpty()) {
+            map?.setOnMyLocationChangeListener(null)
+            zoomToNearestMarker(location)
         }
     }
 
@@ -144,7 +152,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun configure(map: GoogleMap) {
-        findViewById(R.id.fab).setOnClickListener { zoomToNearestMarker() }
+        findViewById(R.id.fab).setOnClickListener { zoomToNearestMarker(map.myLocation) }
         this.map = map
 
         clusterManager = ClusterManager(this, map)
@@ -155,19 +163,19 @@ class MainActivity : AppCompatActivity() {
         map.uiSettings.isMyLocationButtonEnabled = false
     }
 
-    fun zoomToNearestMarker() {
+    fun zoomToNearestMarker(location: Location?) {
         map?.let { map ->
-            map.myLocation?.let { myLocation ->
+            location?.let { location ->
                 markers.sortBy { marker ->
                     val routeLocation = Location(LocationManager.NETWORK_PROVIDER)
                     routeLocation.longitude = marker.position!!.longitude
                     routeLocation.latitude = marker.position!!.latitude
 
-                    myLocation.distanceTo(routeLocation)
+                    location.distanceTo(routeLocation)
                 }
 
                 val bounds = LatLngBounds.Builder()
-                bounds.include(LatLng(myLocation.latitude, myLocation.longitude))
+                bounds.include(LatLng(location.latitude, location.longitude))
                 bounds.include(markers[0].position)
 
                 map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds.build(), 100))
