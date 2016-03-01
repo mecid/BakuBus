@@ -12,10 +12,10 @@ import android.os.Bundle
 import android.preference.PreferenceManager
 import android.support.design.widget.Snackbar
 import android.support.v4.app.ActivityCompat
-import android.support.v4.app.DialogFragment
 import android.support.v4.content.ContextCompat
 import android.support.v7.app.AlertDialog
 import android.support.v7.app.AppCompatActivity
+import android.support.v7.app.AppCompatDialogFragment
 import android.view.Menu
 import android.view.MenuItem
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -43,7 +43,7 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
     val MY_LOCATION_REQUEST_CODE = 88
 
-    var preferences: SharedPreferences? = null
+    val preferences: SharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
     var clusterManager: ClusterManager<BusItem>? = null
     var subscription: Subscription = Subscriptions.empty()
     var routeMap: Map<String, List<Bus>>? = null
@@ -55,7 +55,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.main_activity)
-        preferences = PreferenceManager.getDefaultSharedPreferences(this)
         loadSelectedRoutes()
 
         val mapFragment: SupportMapFragment =
@@ -82,7 +81,7 @@ class MainActivity : AppCompatActivity() {
 
     fun loadSelectedRoutes() {
         try {
-            val json = JSONArray(preferences?.getString("filter", ""))
+            val json = JSONArray(preferences.getString("filter", ""))
 
             selectedRoutes.clear()
 
@@ -254,8 +253,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    inner class FilterDialogFragment : DialogFragment() {
-
+    inner class FilterDialogFragment : AppCompatDialogFragment() {
         val titles = ArrayList<CharSequence>()
         val selected = ArrayList<Boolean>()
 
