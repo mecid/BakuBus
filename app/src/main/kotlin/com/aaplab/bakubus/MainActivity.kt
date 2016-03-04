@@ -2,7 +2,6 @@ package com.aaplab.bakubus
 
 import android.Manifest
 import android.app.Dialog
-import android.content.Context
 import android.content.DialogInterface
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
@@ -16,25 +15,18 @@ import android.support.v4.content.ContextCompat
 import android.support.v7.app.AlertDialog
 import android.support.v7.app.AppCompatActivity
 import android.support.v7.app.AppCompatDialogFragment
+import android.text.TextUtils
 import android.view.Menu
 import android.view.MenuItem
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.SupportMapFragment
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.LatLngBounds
-import com.google.android.gms.maps.model.MarkerOptions
-import com.google.maps.android.clustering.ClusterItem
-import com.google.maps.android.clustering.ClusterManager
-import com.google.maps.android.clustering.view.DefaultClusterRenderer
+import com.google.android.gms.maps.model.*
 import com.google.maps.android.ui.IconGenerator
-import org.json.JSONArray
-import org.json.JSONException
-import rx.Subscription
 import rx.android.schedulers.AndroidSchedulers
 import rx.schedulers.Schedulers
-import rx.subscriptions.Subscriptions
+import rx.subscriptions.CompositeSubscription
+import timber.log.Timber
 import java.util.*
 
 /**
@@ -43,19 +35,23 @@ import java.util.*
 class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
     val MY_LOCATION_REQUEST_CODE = 88
 
-    val preferences: SharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
-    var clusterManager: ClusterManager<BusItem>? = null
-    var subscription: Subscription = Subscriptions.empty()
-    var routeMap: Map<String, List<Bus>>? = null
-    var selectedRoutes = ArrayList<String>()
-    val markers = ArrayList<BusItem>()
+    val subscriptions = CompositeSubscription()
+    val markers = ArrayList<Bus>()
     var map: GoogleMap? = null
     val timer = Timer()
+
+    val markerIconGenerator: IconGenerator by lazy {
+        IconGenerator(this).apply {
+            setStyle(IconGenerator.STYLE_RED)
+            setColor(ActivityCompat.getColor(this@MainActivity, R.color.colorPrimary))
+        }
+    }
+
+    val preferences: SharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.main_activity)
-        loadSelectedRoutes()
 
         val mapFragment: SupportMapFragment =
                 supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
@@ -65,6 +61,7 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
             configure(map)
             enableMyLocation(map)
 
+            downloadAndShowPath()
             timer.schedule(DataUpdateTimerTask(), Date(), 10000)
         }
     }
@@ -87,78 +84,60 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
         }
     }
 
-    fun loadSelectedRoutes() {
-        try {
-            val json = JSONArray(preferences.getString("filter", ""))
-
-            selectedRoutes.clear()
-
-            for (i in 0..json.length() - 1) {
-                selectedRoutes.add(json.getString(i))
-            }
-        } catch(ignored: JSONException) {
-        }
+    fun downloadAndShowPath() {
+        subscriptions.add(
+                DataManager.path(preferences.getString("route", "H1"))
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribeOn(Schedulers.io())
+                        .subscribe({ road ->
+                            val polyline = PolylineOptions()
+                            road.forEach { polyline.add(LatLng(it.location.lat, it.location.lng)) }
+                            polyline.geodesic(true).width(10f).color(getColor(R.color.colorAccent))
+                            map?.addPolyline(polyline)
+                        }, { error ->
+                            Timber.w(error, "")
+                        })
+        )
     }
 
     fun downloadAndShowRoutes() {
-        clusterManager?.let {
-            clusterManager ->
-            subscription = DataManager.routes().retry(3)
-                    .map {
-                        routes ->
-                        val routeMap = HashMap<String, List<Bus>>()
+        subscriptions.add(DataManager.routes().retry(3)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribeOn(Schedulers.io())
+                .subscribe ({
+                    routes: List<Bus> ->
+                    ActivityCompat.invalidateOptionsMenu(this)
+                    val route = preferences.getString("route", "H1")
 
-                        for (bus in routes) {
-                            if (routeMap.containsKey(bus.code)) {
-                                val items: ArrayList<Bus> = routeMap[bus.code] as ArrayList<Bus>
-                                items.add(bus)
-                            } else {
-                                val items = ArrayList<Bus>()
-                                items.add(bus)
-                                routeMap[bus.code] = items
-                            }
+                    markers.clear()
+                    markers.addAll(routes.filter { TextUtils.equals(route, it.code) })
+
+                    map?.let { map ->
+                        map.clear()
+                        markers.forEach { bus ->
+                            val bitmapWithBusRoute = markerIconGenerator.makeIcon(bus.code)
+                            val descriptorWithBusRoute = BitmapDescriptorFactory.fromBitmap(bitmapWithBusRoute)
+
+                            val marker = MarkerOptions()
+                                    .icon(descriptorWithBusRoute)
+                                    .title(bus.plate).snippet(bus.route)
+                                    .position(LatLng(bus.lat, bus.lng))
+
+                            map.addMarker(marker)
                         }
-
-                        routeMap
                     }
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .subscribeOn(Schedulers.io())
-                    .subscribe ({
-                        routeMap: Map<String, List<Bus>> ->
-                        ActivityCompat.invalidateOptionsMenu(this)
-                        this.routeMap = routeMap
-
-                        markers.clear()
-                        clusterManager.clearItems()
-
-                        for ((k, v) in routeMap) {
-                            if (selectedRoutes.isEmpty()) {
-                                clusterManager.addItems(v.map { BusItem(it) })
-                                markers.addAll(v.map { BusItem(it) })
-                            } else {
-                                if (selectedRoutes.contains(k)) {
-                                    clusterManager.addItems(v.map { BusItem(it) })
-                                    markers.addAll(v.map { BusItem(it) })
-                                }
-                            }
-                        }
-
-                        clusterManager.cluster()
-                    }, {
-                        Snackbar.make(findViewById(R.id.coordinator),
-                                R.string.internet_required, Snackbar.LENGTH_LONG).show()
-                    })
-        }
+                }, {
+                    Snackbar.make(findViewById(R.id.coordinator),
+                            R.string.internet_required, Snackbar.LENGTH_LONG).show()
+                    Timber.d(it, "")
+                })
+        )
     }
 
     fun configure(map: GoogleMap) {
         findViewById(R.id.fab).setOnClickListener { zoomToNearestMarker(map.myLocation) }
         this.map = map
 
-        clusterManager = ClusterManager(this, map)
-        clusterManager?.setRenderer(BusRenderer(this, map, clusterManager))
-
-        map.setOnCameraChangeListener(clusterManager)
         map.uiSettings.isMapToolbarEnabled = false
         map.uiSettings.isMyLocationButtonEnabled = false
     }
@@ -168,15 +147,15 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
             location?.let { location ->
                 markers.sortBy { marker ->
                     val routeLocation = Location(LocationManager.NETWORK_PROVIDER)
-                    routeLocation.longitude = marker.position!!.longitude
-                    routeLocation.latitude = marker.position!!.latitude
+                    routeLocation.longitude = marker.lng
+                    routeLocation.latitude = marker.lat
 
                     location.distanceTo(routeLocation)
                 }
 
                 val bounds = LatLngBounds.Builder()
                 bounds.include(LatLng(location.latitude, location.longitude))
-                bounds.include(markers[0].position)
+                bounds.include(LatLng(markers[0].lat, markers[0].lng))
 
                 map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds.build(), 100))
             }
@@ -194,10 +173,7 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
-        routeMap?.let {
-            menuInflater.inflate(R.menu.main, menu)
-        }
-
+        menuInflater.inflate(R.menu.main, menu)
         return true
     }
 
@@ -213,45 +189,8 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
         super.onDestroy()
         timer.cancel()
 
-        if (!subscription.isUnsubscribed) {
-            subscription.unsubscribe()
-        }
-    }
-
-    class BusItem(val bus: Bus) : ClusterItem {
-
-        override fun getPosition(): LatLng? {
-            return LatLng(bus.lat, bus.lng)
-        }
-
-        fun getTitle(): String {
-            return bus.code
-        }
-
-        fun getNumber(): String {
-            return bus.plate;
-        }
-
-        fun getRoute(): String {
-            return bus.route
-        }
-    }
-
-    inner class BusRenderer(context: Context?, map: GoogleMap?, clusterManager: ClusterManager<BusItem>?) :
-            DefaultClusterRenderer<BusItem>(context, map, clusterManager) {
-
-        val markerIconGenerator = IconGenerator(context).apply {
-            setStyle(IconGenerator.STYLE_RED)
-            setColor(ActivityCompat.getColor(context, R.color.colorPrimary))
-        }
-
-        override fun onBeforeClusterItemRendered(item: BusItem?, markerOptions: MarkerOptions?) {
-            super.onBeforeClusterItemRendered(item, markerOptions)
-
-            val bitmapWithBusRoute = markerIconGenerator.makeIcon(item?.getTitle())
-            val descriptorWithBusRoute = BitmapDescriptorFactory.fromBitmap(bitmapWithBusRoute)
-
-            markerOptions?.icon(descriptorWithBusRoute)?.title(item?.getNumber())?.snippet(item?.getRoute())
+        if (!subscriptions.isUnsubscribed) {
+            subscriptions.unsubscribe()
         }
     }
 
@@ -262,61 +201,19 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
     }
 
     inner class FilterDialogFragment : AppCompatDialogFragment() {
-        val titles = ArrayList<CharSequence>()
-        val selected = ArrayList<Boolean>()
-
         override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-            for (title in routeMap?.keys!!) {
-                titles.add(title)
-                selected.add(true)
-            }
+            val selectedRoute = preferences.getString("route", "H1")
+            val titles = ArrayList(DataManager.routeIds.keys)
 
-            for (i in 0..titles.size - 1) {
-                selected[i] = selectedRoutes.contains(titles[i])
-            }
-
-            val builder = AlertDialog.Builder(activity, R.style.AlertDialog)
-
-            builder.setMultiChoiceItems(titles.toTypedArray(), selected.toBooleanArray()) {
-                dialogInterface, position, value ->
-                selected[position] = value
-
-                val action = titles.size == selectedFilterCount()
-                (dialog as AlertDialog).getButton(AlertDialog.BUTTON_NEUTRAL)
-                        .setText(if (action) R.string.deselect_all else android.R.string.selectAll)
-            }.setPositiveButton(android.R.string.ok) {
-                dialogInterface: DialogInterface, i: Int ->
-
-                save()
-                loadSelectedRoutes()
-                downloadAndShowRoutes()
-
-            }.setNegativeButton(android.R.string.cancel) {
-                dialogInterface: DialogInterface, i: Int ->
-
-            }
-
-            return builder.create()
-        }
-
-        fun selectedFilterCount(): Int {
-            var count = 0
-
-            for (i in 0..selected.size - 1)
-                if (selected[i]) count++
-
-            return count
-        }
-
-        fun save() {
-            val array = JSONArray()
-
-            for (i in 0..selected.size - 1) {
-                if (selected[i])
-                    array.put(titles[i])
-            }
-
-            preferences.edit()?.putString("filter", array.toString())?.commit()
+            return AlertDialog.Builder(activity, R.style.AlertDialog)
+                    .setSingleChoiceItems(titles.toTypedArray(), titles.indexOf(selectedRoute)) {
+                        dialogInterface: DialogInterface, i: Int ->
+                        preferences.edit().putString("route", titles[i]).commit()
+                    }
+                    .setPositiveButton(android.R.string.ok) {
+                        dialogInterface: DialogInterface, i: Int ->
+                        downloadAndShowRoutes()
+                    }.setNegativeButton(android.R.string.cancel, null).create()
         }
     }
 }

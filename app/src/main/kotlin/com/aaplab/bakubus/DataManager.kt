@@ -1,7 +1,12 @@
 package com.aaplab.bakubus
 
+import com.google.maps.GeoApiContext
+import com.google.maps.RoadsApi
+import com.google.maps.model.LatLng
+import com.google.maps.model.SnappedPoint
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONException
 import org.json.JSONObject
 import rx.Observable
 import rx.lang.kotlin.observable
@@ -13,14 +18,18 @@ import java.util.*
  * Created by user on 22.02.16.
  */
 object DataManager {
-    val BAKU_BUS_API_URL = "http://bakubus.az/az/ajax/apiNew"
+    val BAKU_BUS_API_PATH = "http://bakubus.az/az/ajax/getPaths/"
+    val BAKU_BUS_API_POSITION = "http://bakubus.az/az/ajax/apiNew/"
+
+    val routeIds = mapOf("H1" to "10034", "1" to "11032", "2" to "11035", "3" to "11037",
+            "5" to "11031", "6" to "11033", "8" to "11034", "14" to "11036")
 
     fun routes(): Observable<List<Bus>> {
         return observable<JSONObject> {
             subscriber ->
             try {
                 val request = Request.Builder()
-                        .url(BAKU_BUS_API_URL)
+                        .url(BAKU_BUS_API_POSITION)
                         .build()
 
                 val response = OkHttpClient().newCall(request).execute()
@@ -37,11 +46,51 @@ object DataManager {
                 val routes = ArrayList<Bus>()
 
                 for (i in 0..array.length() - 1) {
-                    routes.add(createBus(array.getJSONObject(i).getJSONObject("@attributes")))
+                    routes.add(parseBus(array.getJSONObject(i).getJSONObject("@attributes")))
                 }
 
                 it.onNext(routes)
                 it.onCompleted()
+            }
+        }
+    }
+
+    fun path(route: String): Observable<List<SnappedPoint>> {
+        return observable<JSONObject> {
+            subscriber ->
+
+            try {
+                val request = Request.Builder()
+                        .url(BAKU_BUS_API_PATH + routeIds[route])
+                        .build()
+                val response = OkHttpClient().newCall(request).execute()
+
+                subscriber.onNext(JSONObject(response.body().string()))
+                subscriber.onCompleted()
+            } catch(e: Throwable) {
+                subscriber.onError(e)
+            }
+        }.flatMap { json ->
+            observable<List<SnappedPoint>> {
+                try {
+                    val points = ArrayList<LatLng>()
+                    val busStops = json.getJSONObject("Forward").getJSONArray("busstops");
+
+                    for (i in 0..busStops.length() - 1) {
+                        val lat = busStops.getJSONObject(i).getString("latitude").replace(",", ".")
+                        val lng = busStops.getJSONObject(i).getString("longitude").replace(",", ".")
+
+                        points.add(LatLng(lat.toDouble(), lng.toDouble()))
+                    }
+
+                    val context = GeoApiContext().setApiKey("AIzaSyDAir8SvkFkEeuNuLN-gpEhmVbnmrkgBiU")
+                    val road = RoadsApi.snapToRoads(context, true, *points.toTypedArray()).await()
+
+                    it.onNext(road.asList())
+                    it.onCompleted()
+                } catch(e: JSONException) {
+                    it.onError(e)
+                }
             }
         }
     }
@@ -69,7 +118,7 @@ class Bus {
     }
 }
 
-fun createBus(json: JSONObject): Bus {
+fun parseBus(json: JSONObject): Bus {
     val id = json.getInt("BUS_ID")
     val plate = json.getString("PLATE")
 

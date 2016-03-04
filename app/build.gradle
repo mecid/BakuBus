@@ -29,7 +29,8 @@ dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     compile 'com.google.android.gms:play-services-maps:8.4.0'
     compile 'com.google.maps.android:android-maps-utils:0.4.1'
-    compile 'com.android.support:design:23.1.1'
+    compile 'com.google.maps:google-maps-services:0.1.6'
+    compile 'com.android.support:design:23.2.0'
     compile 'com.jakewharton.timber:timber:4.1.1'
     compile 'com.squareup.okhttp3:okhttp:3.1.2'
     compile 'io.reactivex:rxandroid:1.1.0'
