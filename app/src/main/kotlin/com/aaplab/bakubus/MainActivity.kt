@@ -145,19 +145,21 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
     fun zoomToNearestMarker(location: Location?) {
         map?.let { map ->
             location?.let { location ->
-                markers.sortBy { marker ->
-                    val routeLocation = Location(LocationManager.NETWORK_PROVIDER)
-                    routeLocation.longitude = marker.lng
-                    routeLocation.latitude = marker.lat
+                if (markers.isNotEmpty()) {
+                    markers.sortBy { marker ->
+                        val routeLocation = Location(LocationManager.NETWORK_PROVIDER)
+                        routeLocation.longitude = marker.lng
+                        routeLocation.latitude = marker.lat
 
-                    location.distanceTo(routeLocation)
+                        location.distanceTo(routeLocation)
+                    }
+
+                    val bounds = LatLngBounds.Builder()
+                    bounds.include(LatLng(location.latitude, location.longitude))
+                    bounds.include(LatLng(markers[0].lat, markers[0].lng))
+
+                    map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds.build(), 100))
                 }
-
-                val bounds = LatLngBounds.Builder()
-                bounds.include(LatLng(location.latitude, location.longitude))
-                bounds.include(LatLng(markers[0].lat, markers[0].lng))
-
-                map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds.build(), 100))
             }
         }
     }
