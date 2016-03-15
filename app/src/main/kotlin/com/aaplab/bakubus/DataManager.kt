@@ -83,7 +83,7 @@ object DataManager {
                         points.add(LatLng(lat.toDouble(), lng.toDouble()))
                     }
 
-                    val context = GeoApiContext().setApiKey("AIzaSyDAir8SvkFkEeuNuLN-gpEhmVbnmrkgBiU")
+                    val context = GeoApiContext().setApiKey("AIzaSyDwEUaoCyB4WMUwqHXUkW2Te7D6AaicMk0")
                     val road = RoadsApi.snapToRoads(context, true, *points.toTypedArray()).await()
 
                     it.onNext(road.asList())
