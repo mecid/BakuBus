@@ -86,7 +86,7 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
 
     fun downloadAndShowPath() {
         subscriptions.add(
-                DataManager.path(preferences.getString("route", "H1"))
+                DataManager.path(preferences.getString("route", "14"))
                         .observeOn(AndroidSchedulers.mainThread())
                         .subscribeOn(Schedulers.io())
                         .subscribe({ road ->
@@ -107,7 +107,7 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
                 .subscribe ({
                     routes: List<Bus> ->
                     ActivityCompat.invalidateOptionsMenu(this)
-                    val route = preferences.getString("route", "H1")
+                    val route = preferences.getString("route", "14")
 
                     markers.clear()
                     markers.addAll(routes.filter { TextUtils.equals(route, it.code) })
@@ -204,7 +204,7 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
 
     inner class FilterDialogFragment : AppCompatDialogFragment() {
         override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-            val selectedRoute = preferences.getString("route", "H1")
+            val selectedRoute = preferences.getString("route", "14")
             val titles = ArrayList(DataManager.routeIds.keys)
 
             return AlertDialog.Builder(activity, R.style.AlertDialog)
