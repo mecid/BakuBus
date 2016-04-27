@@ -127,15 +127,14 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
                         }
                     }
                 }, {
-                    Snackbar.make(findViewById(R.id.coordinator),
-                            R.string.internet_required, Snackbar.LENGTH_LONG).show()
+                    Snackbar.make(findViewById(R.id.coordinator)!!, R.string.internet_required, Snackbar.LENGTH_LONG).show()
                     Timber.d(it, "")
                 })
         )
     }
 
     fun configure(map: GoogleMap) {
-        findViewById(R.id.fab).setOnClickListener { zoomToNearestMarker(map.myLocation) }
+        findViewById(R.id.fab)!!.setOnClickListener { zoomToNearestMarker(map.myLocation) }
         this.map = map
 
         map.uiSettings.isMapToolbarEnabled = false
