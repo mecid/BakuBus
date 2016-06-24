@@ -92,7 +92,7 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
                         .subscribe({ road ->
                             val polyline = PolylineOptions()
                             road.forEach { polyline.add(LatLng(it.location.lat, it.location.lng)) }
-                            polyline.geodesic(true).width(10f).color(getColor(R.color.colorAccent))
+                            polyline.geodesic(true).width(10f).color(ContextCompat.getColor(this, R.color.colorAccent))
                             map?.addPolyline(polyline)
                         }, { error ->
                             Timber.w(error, "")
