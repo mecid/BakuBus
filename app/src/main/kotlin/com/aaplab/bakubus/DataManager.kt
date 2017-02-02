@@ -22,7 +22,7 @@ object DataManager {
     val BAKU_BUS_API_POSITION = "http://bakubus.az/az/ajax/apiNew/"
 
     val routeIds = mapOf("H1" to "10034", "1" to "11032", "2" to "11035", "3" to "11037", "5" to "11031",
-            "6" to "11033", "7" to "11038", "8" to "11034", "13" to "11039", "14" to "11036")
+            "6" to "11033", "7" to "11038", "8" to "11034", "13" to "11039", "14" to "11036", "21" to "11040")
 
     fun routes(): Observable<List<Bus>> {
         return observable<JSONObject> {
@@ -128,8 +128,8 @@ fun parseBus(json: JSONObject): Bus {
     val currentStop = json.getString("CURRENT_STOP")
     val prevStop = json.getString("PREV_STOP")
 
-    val lat: Double
-    val lng: Double
+    var lat: Double
+    var lng: Double
 
     try {
         val format = NumberFormat.getNumberInstance(Locale.FRANCE);

@@ -180,7 +180,10 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
 
     override fun onOptionsItemSelected(item: MenuItem?): Boolean {
         if (item?.itemId == R.id.menu_filter) {
-            FilterDialogFragment().show(supportFragmentManager, "filter")
+            val filter = FilterDialogFragment()
+            filter.preferences = preferences
+            filter.routeChanged = { downloadAndShowRoutes() }
+            filter.show(supportFragmentManager, "filter")
         }
 
         return super.onOptionsItemSelected(item)
@@ -200,21 +203,24 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
             downloadAndShowRoutes()
         }
     }
+}
 
-    inner class FilterDialogFragment : AppCompatDialogFragment() {
-        override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-            val selectedRoute = preferences.getString("route", "14")
-            val titles = ArrayList(DataManager.routeIds.keys)
+class FilterDialogFragment : AppCompatDialogFragment() {
+    var preferences: SharedPreferences? = null
+    var routeChanged: (() -> Unit)? = null
 
-            return AlertDialog.Builder(activity, R.style.AlertDialog)
-                    .setSingleChoiceItems(titles.toTypedArray(), titles.indexOf(selectedRoute)) {
-                        dialogInterface: DialogInterface, i: Int ->
-                        preferences.edit().putString("route", titles[i]).commit()
-                    }
-                    .setPositiveButton(android.R.string.ok) {
-                        dialogInterface: DialogInterface, i: Int ->
-                        downloadAndShowRoutes()
-                    }.setNegativeButton(android.R.string.cancel, null).create()
-        }
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        val selectedRoute = preferences?.getString("route", "14")
+        val titles = ArrayList(DataManager.routeIds.keys)
+
+        return AlertDialog.Builder(activity, R.style.AlertDialog)
+                .setSingleChoiceItems(titles.toTypedArray(), titles.indexOf(selectedRoute)) {
+                    dialogInterface: DialogInterface, i: Int ->
+                    preferences?.edit()?.putString("route", titles[i])?.apply()
+                }
+                .setPositiveButton(android.R.string.ok) {
+                    dialogInterface: DialogInterface, i: Int ->
+                    routeChanged?.invoke()
+                }.setNegativeButton(android.R.string.cancel, null).create()
     }
 }
