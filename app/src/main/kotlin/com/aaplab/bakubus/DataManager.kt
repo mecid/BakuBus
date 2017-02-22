@@ -22,7 +22,7 @@ object DataManager {
     val BAKU_BUS_API_POSITION = "http://bakubus.az/az/ajax/apiNew/"
 
     val routeIds = mapOf("H1" to "10034", "1" to "11032", "2" to "11035", "3" to "11037", "5" to "11031",
-            "6" to "11033", "7" to "11038", "8" to "11034", "13" to "11039", "14" to "11036", "21" to "11040")
+            "6" to "11033", "8" to "11034", "13" to "11039", "14" to "11036", "21" to "11040")
 
     fun routes(): Observable<List<Bus>> {
         return observable<JSONObject> {
@@ -43,11 +43,7 @@ object DataManager {
             json ->
             observable<List<Bus>> {
                 val array = json.getJSONArray("BUS")
-                val routes = ArrayList<Bus>()
-
-                for (i in 0..array.length() - 1) {
-                    routes.add(parseBus(array.getJSONObject(i).getJSONObject("@attributes")))
-                }
+                val routes = (0..array.length() - 1).mapTo(ArrayList<Bus>()) { parseBus(array.getJSONObject(it).getJSONObject("@attributes")) }
 
                 it.onNext(routes)
                 it.onCompleted()
@@ -74,7 +70,7 @@ object DataManager {
             observable<List<SnappedPoint>> {
                 try {
                     val points = ArrayList<LatLng>()
-                    val busStops = json.getJSONObject("Forward").getJSONArray("busstops");
+                    val busStops = json.getJSONObject("Forward").getJSONArray("busstops")
 
                     for (i in 0..busStops.length() - 1) {
                         val lat = busStops.getJSONObject(i).getString("latitude").replace(",", ".")
@@ -83,7 +79,7 @@ object DataManager {
                         points.add(LatLng(lat.toDouble(), lng.toDouble()))
                     }
 
-                    val context = GeoApiContext().setApiKey("AIzaSyDwEUaoCyB4WMUwqHXUkW2Te7D6AaicMk0")
+                    val context = GeoApiContext().setApiKey("AIzaSyDbFBAfcW65Pik1tzfRaApAU91713jv9U0")
                     val road = RoadsApi.snapToRoads(context, true, *points.toTypedArray()).await()
 
                     it.onNext(road.asList())
@@ -96,27 +92,7 @@ object DataManager {
     }
 }
 
-class Bus {
-    val id: Int
-    val plate: String
-    val code: String
-    val route: String
-    val currentStop: String
-    val prevStop: String
-    val lat: Double
-    val lng: Double
-
-    constructor(id: Int, plate: String, code: String, route: String, currentStop: String, prevStop: String, lat: Double, lng: Double) {
-        this.id = id
-        this.plate = plate
-        this.code = code
-        this.route = route
-        this.currentStop = currentStop
-        this.prevStop = prevStop
-        this.lat = lat
-        this.lng = lng
-    }
-}
+class Bus(val id: Int, val plate: String, val code: String, val route: String, val currentStop: String, val prevStop: String, val lat: Double, val lng: Double)
 
 fun parseBus(json: JSONObject): Bus {
     val id = json.getInt("BUS_ID")
@@ -132,7 +108,7 @@ fun parseBus(json: JSONObject): Bus {
     var lng: Double
 
     try {
-        val format = NumberFormat.getNumberInstance(Locale.FRANCE);
+        val format = NumberFormat.getNumberInstance(Locale.FRANCE)
 
         lat = format.parse(json.getString("LATITUDE")).toDouble()
         lng = format.parse(json.getString("LONGITUDE")).toDouble()

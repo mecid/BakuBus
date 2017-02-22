@@ -36,7 +36,7 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
     val MY_LOCATION_REQUEST_CODE = 88
 
     val subscriptions = CompositeSubscription()
-    val markers = ArrayList<Bus>()
+    val markers = ArrayList<Marker?>()
     var map: GoogleMap? = null
     val timer = Timer()
 
@@ -93,7 +93,7 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
                             val polyline = PolylineOptions()
                             road.forEach { polyline.add(LatLng(it.location.lat, it.location.lng)) }
                             polyline.geodesic(true).width(10f).color(ContextCompat.getColor(this, R.color.colorAccent))
-                            map?.addPolyline(polyline)
+//                            map?.addPolyline(polyline)
                         }, { error ->
                             Timber.w(error, "")
                         })
@@ -104,27 +104,24 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
         subscriptions.add(DataManager.routes().retry(3)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(Schedulers.io())
-                .subscribe ({
+                .subscribe({
                     routes: List<Bus> ->
                     ActivityCompat.invalidateOptionsMenu(this)
                     val route = preferences.getString("route", "14")
 
-                    markers.clear()
-                    markers.addAll(routes.filter { TextUtils.equals(route, it.code) })
+                    markers.forEach { it?.remove() }
+                    routes.filter { TextUtils.equals(route, it.code) }.forEach {
+                        val bitmapWithBusRoute = markerIconGenerator.makeIcon(it.code)
+                        val descriptorWithBusRoute = BitmapDescriptorFactory.fromBitmap(bitmapWithBusRoute)
 
-                    map?.let { map ->
-                        map.clear()
-                        markers.forEach { bus ->
-                            val bitmapWithBusRoute = markerIconGenerator.makeIcon(bus.code)
-                            val descriptorWithBusRoute = BitmapDescriptorFactory.fromBitmap(bitmapWithBusRoute)
-
-                            val marker = MarkerOptions()
-                                    .icon(descriptorWithBusRoute)
-                                    .title(bus.plate).snippet(bus.route)
-                                    .position(LatLng(bus.lat, bus.lng))
-
-                            map.addMarker(marker)
-                        }
+                        markers.add(
+                                map?.addMarker(
+                                        MarkerOptions()
+                                                .icon(descriptorWithBusRoute)
+                                                .title(it.plate).snippet(it.route)
+                                                .position(LatLng(it.lat, it.lng))
+                                )
+                        )
                     }
                 }, {
                     Snackbar.make(findViewById(R.id.coordinator)!!, R.string.internet_required, Snackbar.LENGTH_LONG).show()
@@ -147,15 +144,15 @@ class MainActivity : AppCompatActivity(), GoogleMap.OnMyLocationChangeListener {
                 if (markers.isNotEmpty()) {
                     markers.sortBy { marker ->
                         val routeLocation = Location(LocationManager.NETWORK_PROVIDER)
-                        routeLocation.longitude = marker.lng
-                        routeLocation.latitude = marker.lat
+                        routeLocation.longitude = marker?.position?.latitude ?: 0.0
+                        routeLocation.latitude = marker?.position?.longitude ?: 0.0
 
                         location.distanceTo(routeLocation)
                     }
 
                     val bounds = LatLngBounds.Builder()
                     bounds.include(LatLng(location.latitude, location.longitude))
-                    bounds.include(LatLng(markers[0].lat, markers[0].lng))
+                    bounds.include(LatLng(markers[0]?.position?.latitude ?: 0.0, markers[0]?.position?.longitude ?: 0.0))
 
                     map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds.build(), 100))
                 }
