@@ -19,10 +19,10 @@ import java.util.*
  */
 object DataManager {
     val BAKU_BUS_API_PATH = "http://bakubus.az/az/ajax/getPaths/"
-    val BAKU_BUS_API_POSITION = "http://bakubus.az/az/ajax/apiNew/"
+    val BAKU_BUS_API_POSITION = "https://www.bakubus.az/az/ajax/apiNew1/"
 
     val routeIds = mapOf("H1" to "10034", "1" to "11032", "2" to "11035", "3" to "11037", "5" to "11031",
-            "6" to "11033", "8" to "11034", "13" to "11039", "14" to "11036", "21" to "11040")
+            "6" to "11033", "8" to "11034", "13" to "11039", "14" to "11036", "17" to "11043", "21" to "11040", "125" to "11041","175" to "11044")
 
     fun routes(): Observable<List<Bus>> {
         return observable<JSONObject> {
